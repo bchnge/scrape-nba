@@ -106,7 +106,9 @@ def get_table_from_game(u):
 def get_sql_connection():
     import sqlalchemy
     import json
-    config = json.load('config.json')
+    with open('config.json') as f:
+        config = json.load(f)
+        
     database_username = config.get('db_username')
     database_password = config.get('db_password')
     database_ip       = config.get('db_ip')

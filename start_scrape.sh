@@ -1,7 +1,7 @@
 #!/bin/bash
 
 session_name="scrape_nba"
-package_env_name="test3"
+package_env_name="py38"
 
 tmux new -ds $session_name
 echo $package_env_name

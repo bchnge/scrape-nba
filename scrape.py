@@ -5,6 +5,7 @@ import random
 import time
 import pandas as pd
 import datetime
+import os
 
 def download_data(con, month, day, year):
     try:
@@ -155,18 +156,22 @@ def get_data_from_date(month, day, year):
 
 def download_data_csv(data_path, month, day, year):
     file_path = data_path + 'game' + str(year) + '_' + fluff_number(month) + '_' + fluff_number(day) + '.csv.gz'
-    try:
-        games_data = get_data_from_date(month, day, year)
-        # print(games_data)
-        games_data.to_csv(file_path, index = False, compression = 'gzip')
-        # print(file_path)
-        # print('Finished Saving -- hooray')
-    except:
+    if os.path.exists(file_path) == False:
+        try:
+            games_data = get_data_from_date(month, day, year)
+            # print(games_data)
+            games_data.to_csv(file_path, index = False, compression = 'gzip')
+            # print(file_path)
+            # print('Finished Saving -- hooray')
+        except:
+            return(None)
+    else:
+        print('Already downloaded. Moving on.')
         return(None)
 
 def main():
     data_path = 'data/'
-    numdays = 365 * 2
+    numdays = 365 * 3
     base = datetime.date.today()
     # base = datetime.date(2018,3,3)
     date_list = [base - datetime.timedelta(days=x) for x in range(0, numdays)]

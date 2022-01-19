@@ -5,6 +5,7 @@ import random
 import time
 import pandas as pd
 import datetime
+import json
 import os
 
 def download_data(con, month, day, year):
@@ -17,8 +18,8 @@ def download_data(con, month, day, year):
 def random_proxy(proxies):
     return random.randint(0, len(proxies) - 1)
     
-def open_with_proxy(u, initial_proxy = {'ip': '208.80.28.208', 'port': '8080'}
-, max_tries = 5):
+def open_with_proxy(u, initial_proxy = {'ip': '176.98.95.105', 'port': '32018'}
+, max_tries = 20):
     ua = UserAgent() # From here we generate a random user agent
     proxies = [] # Will contain proxies [ip, port]
 
@@ -37,10 +38,10 @@ def open_with_proxy(u, initial_proxy = {'ip': '208.80.28.208', 'port': '8080'}
             'country': row.find_all('td')[3].string
       })
         
-    print(proxies)
+    #print(proxies)
 
     connected = False
-    num_tries = 5
+    num_tries = 1
 
     while connected is False:
         # Generate a random proxy
@@ -59,6 +60,8 @@ def open_with_proxy(u, initial_proxy = {'ip': '208.80.28.208', 'port': '8080'}
             html = urlopen(req).read().decode('utf8')
             connected = True
             print('Connected with ' + str(num_tries) + ' tries')
+            with open('good_proxies.txt', 'a') as f:
+                f.write(json.dumps(proxy) + '\n')
             return(html)
         except: # If error, delete this proxy and find another one
             del proxies[proxy_index]
@@ -103,7 +106,6 @@ def get_games_from_date(month, day, year):
     u += '&year=' + str(year)
     #print(u)
     html = open_with_proxy(u)
-    print(html)
     soup = BeautifulSoup(html, 'html.parser')
     links = [site_url + x['href'] for x in soup.find_all('a', text = 'Box Score')]
     #print(links)
@@ -144,7 +146,7 @@ def get_table_from_game(u):
 def get_data_from_date(month, day, year):
     games = get_games_from_date(month, day, year)
     data_list = [get_table_from_game(game) for game in games]
-    #print(data_list)
+    print(data_list)
     data = pd.concat(data_list)
     #print(data)
     data['year'] = year

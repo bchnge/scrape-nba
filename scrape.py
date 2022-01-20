@@ -7,6 +7,10 @@ import pandas as pd
 import datetime
 import json
 import os
+from urllib.error import HTTPError, URLError
+import requests
+
+#https://hidemy.name/en/proxy-list/
 
 def download_data(con, month, day, year):
     try:
@@ -17,19 +21,18 @@ def download_data(con, month, day, year):
 
 def random_proxy(proxies):
     return random.randint(0, len(proxies) - 1)
-    
-def open_with_proxy(u, initial_proxy = {'ip': '176.98.95.105', 'port': '32018'}
-, max_tries = 20):
+
+def get_ssl_proxies():
     ua = UserAgent() # From here we generate a random user agent
     proxies = [] # Will contain proxies [ip, port]
 
     # Retrieve latest proxies
     proxies_req = Request('https://www.sslproxies.org/')
-    proxies_req.add_header('User-Agent', ua.random)
+    proxies_req.add_header('User-Agent', 'Mozilla/5.0')
     proxies_doc = urlopen(proxies_req).read().decode('utf8')
     soup = BeautifulSoup(proxies_doc, 'html.parser')
-    # proxies_table = soup.find(id='proxylisttable')
     proxies_table = soup.find('table', {'class': 'table-striped'})
+
   # Save proxies in the array
     for row in proxies_table.tbody.find_all('tr'):
         proxies.append({
@@ -37,37 +40,70 @@ def open_with_proxy(u, initial_proxy = {'ip': '176.98.95.105', 'port': '32018'}
             'port': row.find_all('td')[1].string,
             'country': row.find_all('td')[3].string
       })
-        
-    #print(proxies)
+    proxy_df = pd.DataFrame(proxies)
+    proxy_df.to_csv('ssl_proxies.csv', index = False)
+    print(proxy_df)
+    return proxy_df
+
+def get_working_proxy(u = 'http://www.basketball-reference.com', max_tries = 100):
+    print('--- trying to get a working proxy')
+    proxies = pd.read_csv('ssl_proxies.csv')
 
     connected = False
-    num_tries = 1
+    num_tries = 0
 
-    while connected is False:
-        # Generate a random proxy
-        if num_tries == 0:
-            proxy = initial_proxy
-        else:
-            proxy_index = random_proxy(proxies)
-            proxy = proxies[proxy_index]
-        # print(proxy)
+    while connected is False:     
+        proxy_index = random_proxy(proxies)
+        proxy = dict(proxies.iloc[proxy_index])
+        proxy['port'] = str(proxy['port'])
         num_tries += 1
+        print(num_tries)
     
         req = Request(u)
-        req.set_proxy(proxy['ip'] + ':' + proxy['port'], 'http')
+        req.set_proxy(proxy['ip'] + ':' + proxy['port'], 'https')
 
         try:
-            html = urlopen(req).read().decode('utf8')
+            r = urlopen(req)
+            html = r.read().decode('utf8')
             connected = True
-            print('Connected with ' + str(num_tries) + ' tries')
+            print('Good proxy found with ' + str(num_tries) + ' tries')
             with open('good_proxies.txt', 'a') as f:
                 f.write(json.dumps(proxy) + '\n')
-            return(html)
-        except: # If error, delete this proxy and find another one
-            del proxies[proxy_index]
+            return proxy
+        except:
+            #proxies = proxies[proxies.index != proxy_index]
             if num_tries > max_tries:
                 print('Unable to connect. Max tries reached')
-                return(None)
+                return None
+
+def open_with_proxy(u, max_tries = 10):
+    print('-- trying to open url')
+    print(u)
+    connected = False
+    num_tries = 0
+    # while connected is False and num_tries < max_tries:
+    num_tries += 1
+    s = requests.Session()
+    proxies = {
+        'socks5': 'socks5h://162.223.88.244:51236'
+        }
+    s.proxies = proxies
+    r = s.get(u)
+    print(r)
+    return r.text
+        # #req.add_header('User-Agent', 'Mozilla/5.0')
+        # #req.set_proxy(proxy['ip'] + ':' + proxy['port'], 'https')
+        # try:
+        #     html = urlopen(req).read().decode('utf8')
+        #     connected = True
+        #     print(u)
+        #     print('Page complete, with ' + str(num_tries) + ' tries')        
+        #     return html, proxy
+        # except: # If error, delete this proxy and find another one
+        #     if num_tries >= max_tries:
+        #         num_tries = 1
+        #         proxy = get_working_proxy()
+
 
 def get_stat_from_tr(tr):
     return([tr.find('th')['csk'], dict([(x['data-stat'], x.text) for x in tr.find_all('td')])])
@@ -99,7 +135,7 @@ def fluff_number(x, digits = 2):
 #    df.to_sql(con=con, name='nba_games_players', 
 #              if_exists = 'append', index = False)    
 def get_games_from_date(month, day, year):
-    site_url = 'http://www.basketball-reference.com'
+    site_url = 'https://www.basketball-reference.com'
     u = site_url + '/boxscores/?'
     u += 'month=' + fluff_number(month)
     u += '&day=' + fluff_number(day)
@@ -187,6 +223,8 @@ def main():
     date_list = [base - datetime.timedelta(days=x) for x in range(0, numdays)]
     dates = [(x.month, x.day, x.year) for x in date_list]
     
+    #proxy = get_working_proxy()
+    #print(proxy)
     for x in dates:
         print(x)
         # Save data to a SQL database
@@ -197,4 +235,5 @@ def main():
     
 if __name__ == '__main__':
 #    con = get_sql_connection()
+    get_ssl_proxies()
     main()
